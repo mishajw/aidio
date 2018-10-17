@@ -18,6 +18,9 @@ class AudioAutoencoder:
         self.batch_size = batch_size
         self.audio_input: Optional[tf.Tensor] = None
         self.audio_encoded: Optional[tf.Tensor] = None
+        self.audio_output: Optional[tf.Tensor] = None
+        self.loss: Optional[tf.Tensor] = None
+        self.optimizer: Optional[tf.train.Optimizer] = None
         self.create_model()
 
     def create_model(self) -> None:
@@ -70,3 +73,8 @@ class AudioAutoencoder:
                 "Created decoding layer %d, output shape is %s",
                 i, decode_input.shape)
 
+        self.audio_output = tf.squeeze(decode_input, 2)
+        self.loss = tf.losses.mean_squared_error(
+            self.audio_input, self.audio_output)
+        tf.summary.scalar("loss", self.loss)
+        self.optimizer = tf.train.AdamOptimizer().minimize(self.loss)
