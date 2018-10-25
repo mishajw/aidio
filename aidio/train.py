@@ -40,9 +40,14 @@ def train(training_files: List[str], slice_size: int, encoded_size: int):
 def __get_slices(audio: List[np.array], slice_size: int) -> np.array:
     # Remove any remainders when audio length isn't multiple of `slice_size`
     trimmed = [
-        a[:len(a) // slice_size * len(a)]
+        a[:(len(a) // slice_size) * slice_size]
         for a in audio]
     sliced = [
         np.reshape(a, (-1, slice_size))
-        for a in audio]
-    return np.concatenate(sliced)
+        for a in trimmed]
+    all_slices = np.concatenate(sliced)
+    all_slices = [
+        slice for slice in all_slices
+        if np.std(slice) > 1]
+    np.random.shuffle(all_slices)
+    return all_slices

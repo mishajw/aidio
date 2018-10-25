@@ -18,7 +18,7 @@ def read_audio(path: str) -> np.array:
             bytes = f.readframes(BUFFER_SIZE)
             array = np.frombuffer(bytes, audio_dtype)
             # Convert shape to [num_samples, num_channels]
-            array = np.reshape(array, (BUFFER_SIZE, f.getnchannels()))
+            array = np.reshape(array, (-1, f.getnchannels()))
             # Average across all channels
             array = np.average(array, 1)
             pieces.append(array)
