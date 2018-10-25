@@ -17,8 +17,7 @@ def train(training_files: List[str], slice_size: int, encoded_size: int):
     audio_slices = __get_slices(audio, slice_size)
 
     LOG.info("Creating model")
-    audio_autoencoder = AudioAutoencoder(
-        slice_size, encoded_size, [4, 4, 4], BATCH_SIZE)
+    audio_autoencoder = AudioAutoencoder(slice_size, encoded_size, [4, 4, 4])
 
     LOG.info("Setting up training")
     data_holder = tf_utils.data_holder.DataHolder.from_input_output_lists(
@@ -26,7 +25,7 @@ def train(training_files: List[str], slice_size: int, encoded_size: int):
         input_list=audio_slices,
         output_list=[0] * len(audio_slices))
     runner = tf_utils.generic_runner.GenericRunner(
-        "aidio", training_steps=None, testing_step=10, batch_size=BATCH_SIZE,
+        "aidio", training_steps=None, testing_step=30, batch_size=BATCH_SIZE,
         add_all_summaries=False, run_tag=None)
     runner.set_data_holder(data_holder)
     runner.set_get_feed_dict(lambda t: {audio_autoencoder.audio_input: t[0]})

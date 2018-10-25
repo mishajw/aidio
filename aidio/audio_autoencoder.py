@@ -8,14 +8,10 @@ LOG = logging.getLogger(__name__)
 
 class AudioAutoencoder:
     def __init__(
-            self, input_size: int, encoded_size: int, conv_sizes: List[int],
-            batch_size: int):
+            self, input_size: int, encoded_size: int, conv_sizes: List[int]):
         self.input_size = input_size
         self.encoded_size = encoded_size
         self.conv_sizes = conv_sizes
-        # TODO: Remove batch size argument. We should be able to infer this from
-        # the input, but it's needed for `tf.contrib.nn.conv1d_transpose`
-        self.batch_size = batch_size
         self.audio_input: Optional[tf.Tensor] = None
         self.audio_encoded: Optional[tf.Tensor] = None
         self.audio_output: Optional[tf.Tensor] = None
@@ -24,12 +20,13 @@ class AudioAutoencoder:
         self.create_model()
 
     def create_model(self) -> None:
+
         # The size before and after the fully connected layers around the
         # encoded audio
         pre_encoded_size = self.input_size // 2 ** len(self.conv_sizes)
 
         self.audio_input = tf.placeholder(
-            tf.float32, (self.batch_size, self.input_size), "audio_input")
+            tf.float32, (None, self.input_size), "audio_input")
         LOG.debug("Created input with size %s", self.audio_input.shape)
 
         # Encoding layers, conv1d with stride 2
@@ -67,7 +64,10 @@ class AudioAutoencoder:
             decode_input = tf.contrib.nn.conv1d_transpose(
                 decode_input,
                 conv_weights,
-                [self.batch_size, decode_input.shape[1].value * 2, 1],
+                output_shape=tf.stack([
+                    tf.shape(decode_input)[0],
+                    tf.shape(decode_input)[1] * 2,
+                    1]),
                 stride=2)
             LOG.debug(
                 "Created decoding layer %d, output shape is %s",
