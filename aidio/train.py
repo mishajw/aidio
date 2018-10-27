@@ -1,7 +1,9 @@
 import logging
 import os
 from types import SimpleNamespace
-from typing import List
+from typing import List, Tuple
+
+import numpy as np
 
 import tf_utils
 from aidio import AudioAutoencoder, read_audio, write_audio, slice_audio, \
@@ -21,6 +23,9 @@ def train(
 
     LOG.info("Reading training data")
     audio = list(map(read_audio, training_files))
+    # Take the first audio example and set it aside for testing
+    test_audio, *audio = audio
+    audio, stds = zip(*[normalize_audio(a) for a in audio])
     audio_slices = slice_audio(audio, slice_size)
 
     LOG.info("Creating model")
@@ -44,14 +49,16 @@ def train(
     def test_callback(values):
         nonlocal num_test_calls
         print(num_test_calls, "Test score: ", values)
+        normalized, std = normalize_audio(test_audio)
         sliced = slice_audio(
-            [audio[0]], slice_size, preserve_order=True)
+            [normalized], slice_size, preserve_order=True)
         decoded_sliced = runner.get_session().run(
             audio_autoencoder.audio_output,
             {audio_autoencoder.audio_input: sliced})
-        decoded_unsliced = unslice_audio(decoded_sliced)
+        unsliced = unslice_audio(decoded_sliced)
+        unnormalized = unnormalize_audio(unsliced, std)
         write_audio(
-            decoded_unsliced,
+            unnormalized,
             os.path.join(output_directory, f"test{num_test_calls}.wav"),
             training_files[0])
         num_test_calls += 1
@@ -60,3 +67,12 @@ def train(
 
     LOG.info("Training")
     runner.run()
+
+
+def normalize_audio(audio: np.array) -> Tuple[np.array, float]:
+    std = np.std(audio).item()
+    return audio / std, std
+
+
+def unnormalize_audio(audio: np.array, std: float) -> np.array:
+    return audio * std
