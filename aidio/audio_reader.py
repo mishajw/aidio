@@ -24,3 +24,15 @@ def read_audio(path: str) -> np.array:
             pieces.append(array)
 
     return np.concatenate(pieces)
+
+
+def write_audio(audio: np.array, path: str, original_path: str) -> None:
+    with open(path, "w"):
+        pass
+    f = wave.open(path, "w")
+    with wave.open(original_path, "r") as original_f:
+        f.setframerate(original_f.getframerate())
+        f.setsampwidth(original_f.getsampwidth())
+        f.setnchannels(1)
+        f.writeframes(audio.astype("int16").tobytes())
+    f.close()

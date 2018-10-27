@@ -1,20 +1,27 @@
 import logging
+import os
 from types import SimpleNamespace
 from typing import List
 
-import numpy as np
-
 import tf_utils
-from aidio import AudioAutoencoder, read_audio
+from aidio import AudioAutoencoder, read_audio, write_audio, slice_audio, \
+    unslice_audio
 
 LOG = logging.getLogger(__name__)
 BATCH_SIZE = 2
 
 
-def train(training_files: List[str], slice_size: int, encoded_size: int):
+def train(
+        training_files: List[str],
+        slice_size: int,
+        encoded_size: int,
+        output_directory: str):
+    if not os.path.isdir(output_directory):
+        os.makedirs(output_directory)
+
     LOG.info("Reading training data")
     audio = list(map(read_audio, training_files))
-    audio_slices = __get_slices(audio, slice_size)
+    audio_slices = slice_audio(audio, slice_size)
 
     LOG.info("Creating model")
     audio_autoencoder = AudioAutoencoder(slice_size, encoded_size, [4, 4, 4])
@@ -31,23 +38,25 @@ def train(training_files: List[str], slice_size: int, encoded_size: int):
     runner.set_get_feed_dict(lambda t: {audio_autoencoder.audio_input: t[0]})
     runner.set_train_evaluations([audio_autoencoder.optimizer])
     runner.set_test_evaluations([audio_autoencoder.loss])
-    runner.set_test_callback(lambda data: LOG.info("Test results: %s", data))
+
+    num_test_calls = 0
+
+    def test_callback(values):
+        nonlocal num_test_calls
+        print(num_test_calls, "Test score: ", values)
+        sliced = slice_audio(
+            [audio[0]], slice_size, preserve_order=True)
+        decoded_sliced = runner.get_session().run(
+            audio_autoencoder.audio_output,
+            {audio_autoencoder.audio_input: sliced})
+        decoded_unsliced = unslice_audio(decoded_sliced)
+        write_audio(
+            decoded_unsliced,
+            os.path.join(output_directory, f"test{num_test_calls}.wav"),
+            training_files[0])
+        num_test_calls += 1
+
+    runner.set_test_callback(test_callback)
 
     LOG.info("Training")
     runner.run()
-
-
-def __get_slices(audio: List[np.array], slice_size: int) -> np.array:
-    # Remove any remainders when audio length isn't multiple of `slice_size`
-    trimmed = [
-        a[:(len(a) // slice_size) * slice_size]
-        for a in audio]
-    sliced = [
-        np.reshape(a, (-1, slice_size))
-        for a in trimmed]
-    all_slices = np.concatenate(sliced)
-    all_slices = [
-        slice for slice in all_slices
-        if np.std(slice) > 1]
-    np.random.shuffle(all_slices)
-    return all_slices
