@@ -15,6 +15,7 @@ class AudioAutoencoder:
         self.audio_input: Optional[tf.Tensor] = None
         self.audio_encoded: Optional[tf.Tensor] = None
         self.audio_output: Optional[tf.Tensor] = None
+        self.encoded_modifier: Optional[tf.Tensor] = None
         self.loss: Optional[tf.Tensor] = None
         self.optimizer: Optional[tf.train.Optimizer] = None
         self.create_model()
@@ -27,6 +28,8 @@ class AudioAutoencoder:
 
         self.audio_input = tf.placeholder(
             tf.float32, (None, self.input_size), "audio_input")
+        self.encoded_modifier = tf.placeholder(
+            tf.float32, self.encoded_size, "encoded_modifier")
         LOG.debug("Created input with size %s", self.audio_input.shape)
 
         # Encoding layers, conv1d with stride 2
@@ -48,9 +51,10 @@ class AudioAutoencoder:
         encode_fc_output = tf.layers.dense(
             encode_flattened, self.encoded_size)
         self.audio_encoded = encode_fc_output
+        audio_encoded_modified = self.audio_encoded * self.encoded_modifier
 
         # Fully connected into decode input
-        decode_input = tf.layers.dense(self.audio_encoded, pre_encoded_size)
+        decode_input = tf.layers.dense(audio_encoded_modified, pre_encoded_size)
         LOG.debug(
             "Created decoder input with shape %s", decode_input.shape)
 

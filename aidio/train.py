@@ -7,7 +7,7 @@ import numpy as np
 
 import tf_utils
 from aidio import AudioAutoencoder, read_audio, write_audio, slice_audio, \
-    unslice_audio
+    unslice_audio, normalize_audio, create_experiments
 
 LOG = logging.getLogger(__name__)
 BATCH_SIZE = 2
@@ -37,10 +37,13 @@ def train(
         input_list=audio_slices,
         output_list=[0] * len(audio_slices))
     runner = tf_utils.generic_runner.GenericRunner(
-        "aidio", training_steps=None, testing_step=30, batch_size=BATCH_SIZE,
+        "aidio", training_steps=None, testing_step=100, batch_size=BATCH_SIZE,
         add_all_summaries=False, run_tag=None)
     runner.set_data_holder(data_holder)
-    runner.set_get_feed_dict(lambda t: {audio_autoencoder.audio_input: t[0]})
+    runner.set_get_feed_dict(lambda t: {
+        audio_autoencoder.audio_input: t[0],
+        audio_autoencoder.encoded_modifier: np.ones(encoded_size)
+    })
     runner.set_train_evaluations([audio_autoencoder.optimizer])
     runner.set_test_evaluations([audio_autoencoder.loss])
 
@@ -49,30 +52,15 @@ def train(
     def test_callback(values):
         nonlocal num_test_calls
         print(num_test_calls, "Test score: ", values)
-        normalized, std = normalize_audio(test_audio)
-        sliced = slice_audio(
-            [normalized], slice_size, preserve_order=True)
-        decoded_sliced = runner.get_session().run(
-            audio_autoencoder.audio_output,
-            {audio_autoencoder.audio_input: sliced})
-        unsliced = unslice_audio(decoded_sliced)
-        unnormalized = unnormalize_audio(unsliced, std)
-        write_audio(
-            unnormalized,
-            os.path.join(output_directory, f"test{num_test_calls}.wav"),
-            training_files[0])
+        if num_test_calls % 10 == 0 and num_test_calls != 0:
+            create_experiments(
+                audio_autoencoder, test_audio, training_files[0], encoded_size,
+                slice_size,
+                os.path.join(output_directory, f"experiments_{num_test_calls}"),
+                runner.get_session())
         num_test_calls += 1
 
     runner.set_test_callback(test_callback)
 
     LOG.info("Training")
     runner.run()
-
-
-def normalize_audio(audio: np.array) -> Tuple[np.array, float]:
-    std = np.std(audio).item()
-    return audio / std, std
-
-
-def unnormalize_audio(audio: np.array, std: float) -> np.array:
-    return audio * std

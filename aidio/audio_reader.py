@@ -1,5 +1,5 @@
 import wave
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 
@@ -36,3 +36,12 @@ def write_audio(audio: np.array, path: str, original_path: str) -> None:
         f.setnchannels(1)
         f.writeframes(audio.astype("int16").tobytes())
     f.close()
+
+
+def normalize_audio(audio: np.array) -> Tuple[np.array, float]:
+    std = np.std(audio).item()
+    return audio / std, std
+
+
+def unnormalize_audio(audio: np.array, std: float) -> np.array:
+    return audio * std
